@@ -20,8 +20,15 @@ export function getTMDBKey(): string {
   return (process.env.TMDB_API_KEY || '').trim();
 }
 
+export function getTMDBToken(): string {
+  dotenv.config();
+  dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+  dotenv.config({ path: path.resolve(__dirname, '../.env') });
+  return (process.env.TMDB_READ_ACCESS_TOKEN || '').trim();
+}
+
 export function hasTMDBKey(): boolean {
-  return getTMDBKey().length > 5;
+  return getTMDBKey().length > 5 || getTMDBToken().length > 10;
 }
 
 export function normalizeRawItem(item: any, forceType?: 'movie' | 'tv'): UnifiedMediaItem {
@@ -151,19 +158,27 @@ export function normalizeRawDetail(raw: any, type: 'movie' | 'tv'): UnifiedMedia
 }
 
 export async function fetchTMDB<T>(endpoint: string, params: Record<string, any> = {}, ttlSeconds: number = 3600): Promise<T> {
-  const queryParams = new URLSearchParams({
-    api_key: getTMDBKey(),
-    ...params
-  }).toString();
+  const apiKey = getTMDBKey();
+  const token = getTMDBToken();
+  const queryObj: Record<string, any> = { ...params };
+  if (apiKey) {
+    queryObj.api_key = apiKey;
+  }
 
-  const fullUrl = `${TMDB_BASE_URL}${endpoint}?${queryParams}`;
+  const queryParams = new URLSearchParams(queryObj).toString();
+  const fullUrl = `${TMDB_BASE_URL}${endpoint}${queryParams ? `?${queryParams}` : ''}`;
   const cacheKey = `tmdb:${fullUrl}`;
 
   const cached = serverCache.get<T>(cacheKey);
   if (cached) return cached;
 
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   const data = await tmdbRateLimiter.schedule(async () => {
-    const res = await axios.get<T>(fullUrl, { timeout: 10000 });
+    const res = await axios.get<T>(fullUrl, { headers, timeout: 10000 });
     return res.data;
   });
 
