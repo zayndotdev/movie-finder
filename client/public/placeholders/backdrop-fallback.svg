@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="50%" stop-color="#0B0F19"/>
+      <stop offset="100%" stop-color="#06080F"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bgGrad)"/>
+  <circle cx="640" cy="360" r="70" fill="#F59E0B" fill-opacity="0.1" stroke="#F59E0B" stroke-width="3"/>
+  <polygon points="630,335 665,360 630,385" fill="#F59E0B"/>
+  <text x="640" y="480" fill="#94A3B8" font-family="system-ui, sans-serif" font-size="24" font-weight="600" text-anchor="middle">Cinematic Backdrop Preview</text>
+</svg>

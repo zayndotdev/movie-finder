@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 750" fill="none">
+  <defs>
+    <linearGradient id="posterGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#111828"/>
+      <stop offset="100%" stop-color="#06080F"/>
+    </linearGradient>
+  </defs>
+  <rect width="500" height="750" fill="url(#posterGrad)"/>
+  <rect x="20" y="20" width="460" height="710" rx="16" stroke="#1E2A42" stroke-width="2" stroke-dasharray="8 8"/>
+  <path d="M210 320H290C295.523 320 300 324.477 300 330V400C300 405.523 295.523 410 290 410H210C204.477 410 200 405.523 200 400V330C200 324.477 204.477 320 210 320Z" stroke="#F59E0B" stroke-width="4"/>
+  <polygon points="240,350 270,365 240,380" fill="#F59E0B"/>
+  <text x="250" y="450" fill="#94A3B8" font-family="system-ui, sans-serif" font-size="20" font-weight="600" text-anchor="middle">Poster Coming Soon</text>
+  <text x="250" y="480" fill="#64748B" font-family="system-ui, sans-serif" font-size="14" text-anchor="middle">CineMatch Entertainment</text>
+</svg>
