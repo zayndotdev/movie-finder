@@ -154,5 +154,5 @@ export interface AIChatResponseData {
   reply: string;
   parsedIntent: AIChatIntent;
   recommendations: UnifiedMediaItem[];
-  providerUsed: 'gemini' | 'groq' | 'rule-based';
+  providerUsed: 'gemini' | 'groq' | 'mistral' | 'cohere' | 'rule-based';
 }

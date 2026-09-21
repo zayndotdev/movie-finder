@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import Groq from 'groq-sdk';
+import axios from 'axios';
 import { AIChatIntent, AIChatResponseData, UnifiedMediaItem } from '../types/api';
 import { parseIntentDeterministically, MOOD_RULES } from '../utils/moodMapper';
 import { fetchTMDB, hasTMDBKey, normalizeRawItem } from './tmdbShared';
@@ -21,6 +22,20 @@ function getGroqKey(): string {
   dotenv.config({ path: path.resolve(__dirname, '../../.env') });
   dotenv.config({ path: path.resolve(__dirname, '../.env') });
   return (process.env.GROQ_API_KEY || '').trim();
+}
+
+function getMistralKey(): string {
+  dotenv.config();
+  dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+  dotenv.config({ path: path.resolve(__dirname, '../.env') });
+  return (process.env.MISTRAL_API_KEY || '').trim();
+}
+
+function getCohereKey(): string {
+  dotenv.config();
+  dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+  dotenv.config({ path: path.resolve(__dirname, '../.env') });
+  return (process.env.COHERE_API_KEY || '').trim();
 }
 
 const SYSTEM_PROMPT = `
@@ -56,10 +71,153 @@ SCHEMA:
 }
 `;
 
-export async function parseQueryWithAI(query: string, adultMode: boolean): Promise<{ reply: string; intent: AIChatIntent; searchTitles?: string[]; provider: 'gemini' | 'groq' | 'rule-based' }> {
-  // 1. Try Gemini if configured
+export async function parseQueryWithAI(query: string, adultMode: boolean): Promise<{ reply: string; intent: AIChatIntent; searchTitles?: string[]; provider: 'gemini' | 'groq' | 'mistral' | 'cohere' | 'rule-based' }> {
+  // 1. Try Groq (Ultra-fast LLaMA & GPT OSS)
+  const groqKey = getGroqKey();
+  if (groqKey && groqKey.length > 5) {
+    try {
+      const groq = new Groq({ apiKey: groqKey });
+      const candidateModels = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'llama-3.1-8b-instant'];
+      for (const model of candidateModels) {
+        try {
+          const completion = await groq.chat.completions.create({
+            messages: [
+              { role: 'system', content: SYSTEM_PROMPT },
+              { role: 'user', content: `User Query: "${query}"\nAdult Mode: ${adultMode}` }
+            ],
+            model,
+            response_format: { type: 'json_object' }
+          });
+
+          const content = completion.choices[0]?.message?.content;
+          if (content) {
+            const parsed = JSON.parse(content);
+            if (parsed.intent) {
+              return {
+                reply: parsed.reply || 'I found some titles that align with what you are looking for!',
+                intent: {
+                  contentType: parsed.intent.contentType || 'all',
+                  genres: parsed.intent.genres || [],
+                  keywords: parsed.intent.keywords || [],
+                  minRating: parsed.intent.minRating || undefined,
+                  language: parsed.intent.language || undefined,
+                  yearFrom: parsed.intent.yearFrom || undefined,
+                  yearTo: parsed.intent.yearTo || undefined,
+                  sortBy: parsed.intent.sortBy || 'popularity.desc',
+                  isAdultQuery: Boolean(parsed.intent.isAdultQuery || adultMode),
+                  specificPeople: parsed.intent.specificPeople || []
+                },
+                searchTitles: parsed.searchTitles,
+                provider: 'groq'
+              };
+            }
+          }
+        } catch {
+          // Fall through to next model
+        }
+      }
+    } catch (err) {
+      console.warn('Groq API call failed, trying next provider', err);
+    }
+  }
+
+  // 2. Try Mistral AI
+  const mistralKey = getMistralKey();
+  if (mistralKey && mistralKey.length > 5) {
+    for (const model of ['open-mistral-7b', 'mistral-tiny']) {
+      try {
+        const res = await axios.post(
+          'https://api.mistral.ai/v1/chat/completions',
+          {
+            model,
+            messages: [
+              { role: 'system', content: SYSTEM_PROMPT },
+              { role: 'user', content: `User Query: "${query}"\nAdult Mode: ${adultMode}` }
+            ],
+            response_format: { type: 'json_object' }
+          },
+          { headers: { Authorization: `Bearer ${mistralKey}` }, timeout: 8000 }
+        );
+
+        const content = res.data.choices[0]?.message?.content;
+        if (content) {
+          const parsed = JSON.parse(content);
+          if (parsed.intent) {
+            return {
+              reply: parsed.reply || 'Here are handpicked titles based on your mood!',
+              intent: {
+                contentType: parsed.intent.contentType || 'all',
+                genres: parsed.intent.genres || [],
+                keywords: parsed.intent.keywords || [],
+                minRating: parsed.intent.minRating || undefined,
+                language: parsed.intent.language || undefined,
+                yearFrom: parsed.intent.yearFrom || undefined,
+                yearTo: parsed.intent.yearTo || undefined,
+                sortBy: parsed.intent.sortBy || 'popularity.desc',
+                isAdultQuery: Boolean(parsed.intent.isAdultQuery || adultMode),
+                specificPeople: parsed.intent.specificPeople || []
+              },
+              searchTitles: parsed.searchTitles,
+              provider: 'mistral'
+            };
+          }
+        }
+      } catch {
+        // Fall through
+      }
+    }
+  }
+
+  // 3. Try Cohere
+  const cohereKey = getCohereKey();
+  if (cohereKey && cohereKey.length > 5) {
+    for (const model of ['command-r-08-2024', 'command-r7b-12-2024']) {
+      try {
+        const res = await axios.post(
+          'https://api.cohere.com/v2/chat',
+          {
+            model,
+            messages: [
+              { role: 'system', content: `${SYSTEM_PROMPT}\nReturn ONLY JSON, no markdown codeblocks.` },
+              { role: 'user', content: `User Query: "${query}"\nAdult Mode: ${adultMode}` }
+            ],
+            response_format: { type: 'json_object' }
+          },
+          { headers: { Authorization: `Bearer ${cohereKey}` }, timeout: 8000 }
+        );
+
+        const content = res.data?.message?.content?.[0]?.text;
+        if (content) {
+          const parsed = JSON.parse(content);
+          if (parsed.intent) {
+            return {
+              reply: parsed.reply || 'Tailored with Cohere AI for your vibe!',
+              intent: {
+                contentType: parsed.intent.contentType || 'all',
+                genres: parsed.intent.genres || [],
+                keywords: parsed.intent.keywords || [],
+                minRating: parsed.intent.minRating || undefined,
+                language: parsed.intent.language || undefined,
+                yearFrom: parsed.intent.yearFrom || undefined,
+                yearTo: parsed.intent.yearTo || undefined,
+                sortBy: parsed.intent.sortBy || 'popularity.desc',
+                isAdultQuery: Boolean(parsed.intent.isAdultQuery || adultMode),
+                specificPeople: parsed.intent.specificPeople || []
+              },
+              searchTitles: parsed.searchTitles,
+              provider: 'cohere'
+            };
+          }
+        }
+      } catch {
+        // Fall through
+      }
+    }
+  }
+
+  // 4. Try Gemini if configured
   const geminiKey = getGeminiKey();
-  if (geminiKey && geminiKey.length > 5) {
+  if (geminiKey && geminiKey.length > 5 && !geminiKey.startsWith('AQ.')) {
     try {
       const genAI = new GoogleGenerativeAI(geminiKey);
       const model = genAI.getGenerativeModel({
@@ -92,53 +250,11 @@ export async function parseQueryWithAI(query: string, adultMode: boolean): Promi
         };
       }
     } catch (err) {
-      console.warn('Gemini API call failed, attempting fallback to Groq', err);
+      console.warn('Gemini API call failed', err);
     }
   }
 
-  // 2. Try Groq fallback if configured
-  const groqKey = getGroqKey();
-  if (groqKey && groqKey.length > 5) {
-    try {
-      const groq = new Groq({ apiKey: groqKey });
-      const completion = await groq.chat.completions.create({
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: `User Query: "${query}"\nAdult Mode: ${adultMode}` }
-        ],
-        model: 'llama-3.1-8b-instant',
-        response_format: { type: 'json_object' }
-      });
-
-      const content = completion.choices[0]?.message?.content;
-      if (content) {
-        const parsed = JSON.parse(content);
-        if (parsed.intent) {
-          return {
-            reply: parsed.reply || 'I found some titles that align with what you are looking for!',
-            intent: {
-              contentType: parsed.intent.contentType || 'all',
-              genres: parsed.intent.genres || [],
-              keywords: parsed.intent.keywords || [],
-              minRating: parsed.intent.minRating || undefined,
-              language: parsed.intent.language || undefined,
-              yearFrom: parsed.intent.yearFrom || undefined,
-              yearTo: parsed.intent.yearTo || undefined,
-              sortBy: parsed.intent.sortBy || 'popularity.desc',
-              isAdultQuery: Boolean(parsed.intent.isAdultQuery || adultMode),
-              specificPeople: parsed.intent.specificPeople || []
-            },
-            searchTitles: parsed.searchTitles,
-            provider: 'groq'
-          };
-        }
-      }
-    } catch (err) {
-      console.warn('Groq API call failed, falling back to deterministic parser', err);
-    }
-  }
-
-  // 3. Deterministic rule-based fallback
+  // 5. Deterministic rule-based fallback
   const intent = parseIntentDeterministically(query, adultMode);
   const matchedRule = MOOD_RULES.find(r => r.regex.some(rx => rx.test(query)));
   const reply = matchedRule
