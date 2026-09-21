@@ -148,6 +148,8 @@ export interface AIChatIntent {
   sortBy?: string;
   isAdultQuery?: boolean;
   specificPeople?: string[];
+  isConversational?: boolean;
+  limit?: number;
 }
 
 export interface AIChatResponseData {

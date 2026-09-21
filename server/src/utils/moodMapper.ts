@@ -128,6 +128,19 @@ export const GENRE_MAP: Record<number, string> = {
 export function parseIntentDeterministically(query: string, adultMode: boolean): AIChatIntent {
   const lower = query.toLowerCase();
 
+  // Check for purely conversational / greeting queries
+  const isGreeting = /^(hey|hello|hi|hii|heyy|howdy|sup|yo|greetings|good\s+(morning|afternoon|evening)|what'?s\s+up|who\s+are\s+you|what\s+can\s+you\s+do|help|thanks|thank\s+you)\b/i.test(lower.trim());
+  const asksForRecommendations = /\b(movie|movies|film|films|show|shows|series|watch|recommend|recommendation|find|suggest|pick|give|list)\b/i.test(lower);
+  const isConversational = isGreeting && !asksForRecommendations;
+
+  // Extract limit (e.g., "give me 3 movies", "top 2 shows", "1 film")
+  let limit: number = isConversational ? 0 : 5;
+  const limitMatch = lower.match(/\b([1-9]|10)\s*(?:movies?|shows?|series|films?|titles?|recommendations?|picks?|suggestions?)\b/i) ||
+                     lower.match(/(?:top|give\s+me|show\s+me|find|recommend)\s*([1-9]|10)\b/i);
+  if (limitMatch) {
+    limit = parseInt(limitMatch[1], 10);
+  }
+
   // 1. Detect content type
   let contentType: 'movie' | 'tv' | 'all' = 'all';
   const isTV = /\b(tv|series|show|shows|season|seasons|episode|episodes|k-drama|kdrama|anime series|sitcom)\b/i.test(lower);
@@ -212,6 +225,9 @@ export function parseIntentDeterministically(query: string, adultMode: boolean):
     yearFrom,
     yearTo,
     sortBy,
-    isAdultQuery
+    isAdultQuery,
+    isConversational,
+    limit
   };
 }
+

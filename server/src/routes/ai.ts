@@ -5,7 +5,7 @@ const router = Router();
 
 router.post('/chat', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { query, adultMode } = req.body;
+    const { query, adultMode, history } = req.body;
 
     if (!query || typeof query !== 'string' || !query.trim()) {
       res.status(400).json({
@@ -15,7 +15,7 @@ router.post('/chat', async (req: Request, res: Response, next: NextFunction) => 
       return;
     }
 
-    const chatResponse = await processAIChat(query.trim(), Boolean(adultMode));
+    const chatResponse = await processAIChat(query.trim(), Boolean(adultMode), history);
 
     res.json({
       success: true,

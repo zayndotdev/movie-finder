@@ -148,13 +148,19 @@ export async function fetchPersonDetail(id: number): Promise<ApiResponse<PersonD
 }
 
 // AI Chat
-export async function sendAIChatMessage(query: string, adultMode: boolean): Promise<ApiResponse<AIChatResponseData>> {
+export async function sendAIChatMessage(
+  query: string,
+  adultMode: boolean,
+  history?: { sender: string; text: string }[]
+): Promise<ApiResponse<AIChatResponseData>> {
   const res = await api.post<ApiResponse<AIChatResponseData>>('/ai/chat', {
     query,
-    adultMode
+    adultMode,
+    history
   });
   return res.data;
 }
+
 
 // Genres Metadata
 export async function fetchGenres(): Promise<ApiResponse<{ id: number; name: string }[]>> {

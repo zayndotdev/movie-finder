@@ -55,7 +55,12 @@ export const useAIChatStore = create<AIChatState>((set, get) => ({
 
     try {
       const adultMode = useAdultStore.getState().adultMode;
-      const res = await sendAIChatMessage(query.trim(), adultMode);
+      const history = get().messages
+        .filter(m => m.id !== 'greeting')
+        .slice(-6)
+        .map(m => ({ sender: m.sender, text: m.text }));
+
+      const res = await sendAIChatMessage(query.trim(), adultMode, history);
 
       const agentMessage: ChatMessage = {
         id: `agent-${Date.now()}`,
