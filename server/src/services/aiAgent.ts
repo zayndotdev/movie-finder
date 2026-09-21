@@ -7,11 +7,21 @@ import { fetchTMDB, hasTMDBKey, normalizeRawItem } from './tmdbShared';
 import { filterAdultContent } from './adultFilter';
 import { MOCK_MEDIA_ITEMS } from './mockData';
 import { serverCache } from '../utils/cache';
+import path from 'path';
 
-dotenv.config();
+function getGeminiKey(): string {
+  dotenv.config();
+  dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+  dotenv.config({ path: path.resolve(__dirname, '../.env') });
+  return (process.env.GEMINI_API_KEY || '').trim();
+}
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+function getGroqKey(): string {
+  dotenv.config();
+  dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+  dotenv.config({ path: path.resolve(__dirname, '../.env') });
+  return (process.env.GROQ_API_KEY || '').trim();
+}
 
 const SYSTEM_PROMPT = `
 You are CineMatch AI, an expert cinematic and television discovery agent.
@@ -48,9 +58,10 @@ SCHEMA:
 
 export async function parseQueryWithAI(query: string, adultMode: boolean): Promise<{ reply: string; intent: AIChatIntent; searchTitles?: string[]; provider: 'gemini' | 'groq' | 'rule-based' }> {
   // 1. Try Gemini if configured
-  if (GEMINI_API_KEY && GEMINI_API_KEY.trim().length > 5) {
+  const geminiKey = getGeminiKey();
+  if (geminiKey && geminiKey.length > 5) {
     try {
-      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+      const genAI = new GoogleGenerativeAI(geminiKey);
       const model = genAI.getGenerativeModel({
         model: 'gemini-1.5-flash',
         generationConfig: { responseMimeType: 'application/json' }
@@ -86,9 +97,10 @@ export async function parseQueryWithAI(query: string, adultMode: boolean): Promi
   }
 
   // 2. Try Groq fallback if configured
-  if (GROQ_API_KEY && GROQ_API_KEY.trim().length > 5) {
+  const groqKey = getGroqKey();
+  if (groqKey && groqKey.length > 5) {
     try {
-      const groq = new Groq({ apiKey: GROQ_API_KEY });
+      const groq = new Groq({ apiKey: groqKey });
       const completion = await groq.chat.completions.create({
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },

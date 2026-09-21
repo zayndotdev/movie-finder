@@ -7,13 +7,21 @@ import { serverCache } from '../utils/cache';
 import { tmdbRateLimiter } from '../utils/rateLimiter';
 import { MOCK_MEDIA_ITEMS, MOCK_PERSONS } from './mockData';
 
+import path from 'path';
+
 dotenv.config();
 
 export const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
-export const TMDB_API_KEY = process.env.TMDB_API_KEY || '';
+
+export function getTMDBKey(): string {
+  dotenv.config();
+  dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+  dotenv.config({ path: path.resolve(__dirname, '../.env') });
+  return (process.env.TMDB_API_KEY || '').trim();
+}
 
 export function hasTMDBKey(): boolean {
-  return Boolean(TMDB_API_KEY && TMDB_API_KEY.trim().length > 5);
+  return getTMDBKey().length > 5;
 }
 
 export function normalizeRawItem(item: any, forceType?: 'movie' | 'tv'): UnifiedMediaItem {
@@ -144,7 +152,7 @@ export function normalizeRawDetail(raw: any, type: 'movie' | 'tv'): UnifiedMedia
 
 export async function fetchTMDB<T>(endpoint: string, params: Record<string, any> = {}, ttlSeconds: number = 3600): Promise<T> {
   const queryParams = new URLSearchParams({
-    api_key: TMDB_API_KEY,
+    api_key: getTMDBKey(),
     ...params
   }).toString();
 
